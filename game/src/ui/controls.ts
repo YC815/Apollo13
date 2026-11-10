@@ -15,39 +15,22 @@ export const CTRL_ID = {
   reset:     'ctrl-reset',
 } as const
 
-const BTN_CSS = [
-  'font-family:monospace',
-  'font-size:13px',
-  'background:#000',
-  'color:#0f0',
-  'border:1px solid #0f0',
-  'padding:6px 14px',
-  'cursor:pointer',
-  'margin:4px 6px 4px 0',
-  'outline:none',
-  'user-select:none',
-  '-webkit-user-select:none',
-].join(';')
-
 function makeBtn(id: string, label: string): HTMLButtonElement {
   const el = document.createElement('button')
   el.id = id
   el.textContent = label
-  el.style.cssText = BTN_CSS
   return el
 }
 
 export function setupControls(h: InputHandlers): void {
-  const row = document.createElement('div')
-  row.style.cssText = 'margin-top:20px;padding-top:12px;border-top:1px solid #0f0'
+  const row = document.getElementById('controls-slot-cockpit')!
 
-  const heaterBtn = makeBtn(CTRL_ID.heater, '[加熱器 HEATER: off]')
-  const filterBtn = makeBtn(CTRL_ID.co2Filter, '[濾罐 CO2 FILT: off]')
-  const navBtn    = makeBtn(CTRL_ID.navComp, '[導航 NAV COMP: off]')
-  const o2Btn     = makeBtn(CTRL_ID.o2Release, '[放氧 O2 RELEASE]')
-  const resetBtn  = makeBtn(CTRL_ID.reset, '[!! 重置 RESET !!]')
-  resetBtn.style.color = '#f44'
-  resetBtn.style.borderColor = '#f44'
+  const heaterBtn = makeBtn(CTRL_ID.heater, '加熱 HEATER off')
+  const filterBtn = makeBtn(CTRL_ID.co2Filter, '濾罐 CO2 off')
+  const navBtn    = makeBtn(CTRL_ID.navComp, '導航 NAV off')
+  const o2Btn     = makeBtn(CTRL_ID.o2Release, '放氧 O2')
+  const resetBtn  = makeBtn(CTRL_ID.reset, '!! RESET !!')
+  resetBtn.classList.add('btn-reset')
   resetBtn.style.display = 'none'
 
   heaterBtn.addEventListener('click', () => h.toggleDevice('heater'))
@@ -63,5 +46,4 @@ export function setupControls(h: InputHandlers): void {
   resetBtn.addEventListener('click', () => h.doReset())
 
   row.append(heaterBtn, filterBtn, navBtn, o2Btn, resetBtn)
-  document.body.appendChild(row)
 }

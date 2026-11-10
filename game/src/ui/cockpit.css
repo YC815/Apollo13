@@ -1,0 +1,252 @@
+/* 艙內儀表板 — 底部整合佈局，讀數在上、狀態居中、按鈕在最底 */
+
+:root {
+  --panel-tex: none;
+  --btn-tex: none;
+  --gauge-tex: none;
+  --panel-amber: #ffb000;
+  --panel-green: #33ff66;
+  --panel-red: #ff3344;
+  --panel-border: #3a4a3a;
+}
+
+#cockpit-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#cockpit-panel {
+  width: 100%;
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+.panel-bezel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background:
+    var(--panel-tex),
+    linear-gradient(180deg, #1e1e24 0%, #101014 100%);
+  background-size: cover, auto;
+  border: 2px solid var(--panel-border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.7);
+  padding: 10px 12px 12px;
+  max-height: 38vh;
+}
+
+/* ── 讀數列：水平排列，緊湊 ── */
+.panel-readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(51, 255, 102, 0.15);
+  flex-shrink: 0;
+}
+
+.readout {
+  flex: 1 1 72px;
+  min-width: 64px;
+  max-width: 120px;
+  background:
+    var(--gauge-tex),
+    rgba(0, 0, 0, 0.45);
+  background-size: cover, auto;
+  border: 1px solid rgba(51, 255, 102, 0.2);
+  border-radius: 4px;
+  padding: 5px 7px;
+}
+
+.readout-eta {
+  flex: 1.4 1 100px;
+  max-width: 140px;
+}
+
+.readout-amp {
+  flex: 1.2 1 90px;
+  max-width: 130px;
+}
+
+.readout-dev {
+  flex: 0.9 1 64px;
+  max-width: 80px;
+}
+
+.readout-label {
+  display: block;
+  font-size: 8px;
+  color: rgba(51, 255, 102, 0.6);
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+}
+
+.readout-value {
+  display: block;
+  font-size: 12px;
+  color: var(--panel-green);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.readout-digital {
+  font-size: 15px;
+  color: var(--panel-amber);
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(255, 176, 0, 0.4);
+}
+
+.readout-tanks {
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.bar-track {
+  height: 5px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(51, 255, 102, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 2px 0;
+}
+
+.bar-amp-track { height: 7px; }
+
+.bar-fill {
+  height: 100%;
+  width: 50%;
+  transition: width 0.15s ease;
+}
+
+.bar-pwr  { background: linear-gradient(90deg, #226622, var(--panel-green)); }
+.bar-o2   { background: linear-gradient(90deg, #224466, #44aaff); }
+.bar-co2  { background: linear-gradient(90deg, #664422, #ff8844); }
+.bar-temp { background: linear-gradient(90deg, #2244aa, #88ccff); }
+.bar-amp  { background: linear-gradient(90deg, var(--panel-green), var(--panel-amber)); }
+.bar-amp.bar-danger { background: linear-gradient(90deg, var(--panel-amber), var(--panel-red)); }
+
+.dev-dial {
+  position: relative;
+  width: 44px;
+  height: 22px;
+  margin: 2px auto;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(51,255,102,0.2);
+  border-radius: 22px 22px 0 0;
+  overflow: hidden;
+}
+
+.dev-needle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  height: 18px;
+  background: var(--panel-amber);
+  transform-origin: bottom center;
+  transform: translateX(-50%) rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+/* ── 即時狀態列 ── */
+.panel-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+  padding: 6px 2px;
+  flex-shrink: 0;
+}
+
+.panel-phase {
+  font-size: 10px;
+  color: var(--panel-green);
+  padding: 2px 7px;
+  border: 1px solid rgba(51, 255, 102, 0.35);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.panel-status {
+  flex: 1;
+  font-size: 11px;
+  color: var(--panel-red);
+  letter-spacing: 0.5px;
+  min-width: 0;
+}
+
+.amp-warn-inline.visible {
+  flex-shrink: 0;
+}
+
+/* ── 按鈕列：固定最底，不被遮擋 ── */
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(51, 255, 102, 0.2);
+  flex-shrink: 0;
+}
+
+.panel-view-slot,
+.panel-controls-slot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.panel-view-slot button,
+.panel-controls-slot button {
+  font-family: monospace;
+  font-size: 11px;
+  padding: 7px 11px;
+  cursor: pointer;
+  border: 1px solid rgba(51, 255, 102, 0.5);
+  border-radius: 3px;
+  color: var(--panel-green);
+  background:
+    var(--btn-tex),
+    linear-gradient(180deg, #1a2a1a 0%, #0a120a 100%);
+  background-size: cover, auto;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.panel-view-slot button {
+  border-color: rgba(0, 170, 255, 0.5);
+  color: #66ccff;
+  background:
+    var(--btn-tex),
+    linear-gradient(180deg, #0a1a2a 0%, #050a12 100%);
+  background-size: cover, auto;
+}
+
+.panel-controls-slot .btn-reset {
+  border-color: rgba(255, 68, 68, 0.7);
+  color: #ff5566;
+}
+
+.panel-view-slot button.view-active {
+  background: #0a5a8a;
+  box-shadow: 0 0 6px rgba(102, 204, 255, 0.5);
+  outline: 1px solid #66ccff;
+}
+
+.panel-controls-slot button:active,
+.panel-view-slot button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 600px) {
+  .panel-bezel { max-height: 48vh; }
+  .readout { flex: 1 1 56px; min-width: 52px; }
+  .readout-digital { font-size: 13px; }
+  .panel-view-slot button,
+  .panel-controls-slot button { font-size: 10px; padding: 6px 8px; }
+}

@@ -3,6 +3,7 @@ import { initialState } from './state'
 import { FIXED_DT, MAX_FRAME } from './constants'
 import { step } from './systems/index'
 import { render } from '../ui/dashboard'
+import { updateScene3d } from '../ui/scene3d'
 import { updateVignette, updateFrost, updateCursorDrift } from '../ui/effects'
 import { applyToggleDevice, applySetO2Held, applyReset } from './input'
 
@@ -20,6 +21,7 @@ function frame(now: number): void {
     acc -= FIXED_DT
   }
   render(state, tick)
+  updateScene3d(state)
   updateVignette(state)
   updateFrost(state)
   updateCursorDrift(state)

@@ -4,19 +4,108 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>阿波羅 13 號：電力搶救 Apollo 13: Power Triage</title>
+    <link rel="stylesheet" href="/src/ui/cockpit.css" />
     <style>
-      body { margin: 0; background: #000; color: #0f0; font-family: monospace; font-size: 14px; padding: 20px; line-height: 1.6; }
-      /* T-064: device state animations */
-      @keyframes flashRed    { 0%,100%{border-color:#0f0;color:#0f0} 50%{border-color:#f44;color:#f44} }
-      @keyframes flashYellow { 0%,100%{border-color:#0f0;color:#0f0} 50%{border-color:#fa0;color:#fa0} }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #000; color: #0f0; font-family: monospace; overflow: hidden; }
+      #app { position: relative; width: 100vw; height: 100vh; }
+      #canvas-container { position: absolute; inset: 0; }
+      #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+      .hud-dock {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        padding: 0 12px 12px;
+        pointer-events: none;
+      }
+      .hud-dock > * { pointer-events: auto; }
+
+      #title-bar {
+        position: absolute; top: 16px; right: 20px;
+        color: rgba(0, 255, 0, 0.6); font-size: 11px;
+        letter-spacing: 2px; pointer-events: none;
+        text-align: right; z-index: 11;
+      }
+      body.mode-interior #title-bar { opacity: 0.35; }
+
+      @keyframes flashRed    { 0%,100%{border-color:#3a5a3a;color:#3f6} 50%{border-color:#f44;color:#f44} }
+      @keyframes flashYellow { 0%,100%{border-color:#3a5a3a;color:#3f6} 50%{border-color:#fa0;color:#fa0} }
       @keyframes flashAmp    { 0%,100%{color:#f44} 50%{color:#ff0} }
-      .btn-overheat { animation: flashRed    0.4s infinite }
+      .btn-overheat { animation: flashRed 0.4s infinite }
       .btn-degraded { animation: flashYellow 1.2s infinite }
-      #amp-warn { display:none; color:#f44; animation: flashAmp 0.3s infinite; font-weight:bold; margin-top:4px; }
-      #amp-warn.visible { display:block; }
+      .amp-warn-inline {
+        display: none; color: #f44; animation: flashAmp 0.3s infinite;
+        font-weight: bold; font-size: 11px;
+      }
+      .amp-warn-inline.visible { display: inline; }
     </style>
   </head>
-  <body>
+  <body class="mode-exterior">
+    <div id="app">
+      <div id="canvas-container"></div>
+      <div id="title-bar">APOLLO 13<br/>POWER TRIAGE</div>
+      <div id="hud">
+        <div id="cockpit-hud">
+          <div class="hud-dock">
+            <div id="cockpit-panel">
+              <div class="panel-bezel">
+                <div class="panel-readouts">
+                  <div class="readout readout-eta">
+                    <span class="readout-label">ETA</span>
+                    <span class="readout-value readout-digital" id="cp-eta">00:00:00</span>
+                  </div>
+                  <div class="readout">
+                    <span class="readout-label">PWR</span>
+                    <div class="bar-track"><div class="bar-fill bar-pwr" id="cp-pwr-bar"></div></div>
+                    <span class="readout-value" id="cp-pwr">100%</span>
+                  </div>
+                  <div class="readout">
+                    <span class="readout-label">O2</span>
+                    <div class="bar-track"><div class="bar-fill bar-o2" id="cp-o2-bar"></div></div>
+                    <span class="readout-value" id="cp-o2">100%</span>
+                  </div>
+                  <div class="readout">
+                    <span class="readout-label">LIQ</span>
+                    <span class="readout-value readout-tanks" id="cp-liqo2">■■■</span>
+                  </div>
+                  <div class="readout">
+                    <span class="readout-label">CO2</span>
+                    <div class="bar-track"><div class="bar-fill bar-co2" id="cp-co2-bar"></div></div>
+                    <span class="readout-value" id="cp-co2">400</span>
+                  </div>
+                  <div class="readout">
+                    <span class="readout-label">TEMP</span>
+                    <div class="bar-track"><div class="bar-fill bar-temp" id="cp-temp-bar"></div></div>
+                    <span class="readout-value" id="cp-temp">21°</span>
+                  </div>
+                  <div class="readout readout-dev">
+                    <span class="readout-label">DEV</span>
+                    <div class="dev-dial"><div class="dev-needle" id="cp-dev-needle"></div></div>
+                    <span class="readout-value" id="cp-dev">0%</span>
+                  </div>
+                  <div class="readout readout-amp">
+                    <span class="readout-label">AMP</span>
+                    <div class="bar-track bar-amp-track"><div class="bar-fill bar-amp" id="cp-amp-bar"></div></div>
+                    <span class="readout-value" id="cp-amp">0A</span>
+                  </div>
+                </div>
+
+                <div class="panel-status-bar">
+                  <span class="panel-phase" id="cp-phase">PLAYING</span>
+                  <span class="panel-status" id="cp-status"></span>
+                  <span id="amp-warn-cockpit" class="amp-warn-inline">!! AMP OVER REDLINE !!</span>
+                </div>
+
+                <div class="panel-actions">
+                  <div id="view-slot-cockpit" class="panel-view-slot"></div>
+                  <div id="controls-slot-cockpit" class="panel-controls-slot"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 import type { GameState, DeviceState, Phase, LoseReason } from '../game/state'
-import { LIQO2_PER_TANK } from '../game/constants'
+import { LIQO2_PER_TANK, CO2_LETHAL, TEMP_LETHAL, TEMP_INIT, DEV_LETHAL, AMP_REDLINE } from '../game/constants'
 import { CTRL_ID } from './controls'
 
 const PHASE_TEXT: Record<Phase, string> = {
@@ -17,14 +17,20 @@ const LOSE_TEXT: Record<LoseReason, string> = {
   deviation: '航道偏離 DEVIATION',
 }
 
-let display: HTMLPreElement | null = null
+function $(id: string): HTMLElement | null {
+  return document.getElementById(id)
+}
 
-function getDisplay(): HTMLPreElement {
-  if (!display) {
-    display = document.createElement('pre')
-    document.body.appendChild(display)
-  }
-  return display
+function setText(id: string, text: string): void {
+  const el = $(id)
+  if (el) el.textContent = text
+}
+
+function setBar(id: string, pct: number, danger = false): void {
+  const el = $(id)
+  if (!el) return
+  el.style.width = `${Math.max(0, Math.min(100, pct))}%`
+  el.classList.toggle('bar-danger', danger)
 }
 
 function formatETA(metSeconds: number): string {
@@ -37,7 +43,7 @@ function formatETA(metSeconds: number): string {
 
 function formatLiqO2(liqO2: number): string {
   const tanks = Math.ceil(liqO2 / LIQO2_PER_TANK)
-  return Array.from({ length: 3 }, (_, i) => i < tanks ? '[■]' : '[□]').join('')
+  return Array.from({ length: 3 }, (_, i) => i < tanks ? '■' : '□').join(' ')
 }
 
 function deviceLabel(d: DeviceState): string {
@@ -58,72 +64,80 @@ function setBtnClass(id: string, cls: string, on: boolean): void {
   document.getElementById(id)?.classList.toggle(cls, on)
 }
 
-let ampWarnEl: HTMLDivElement | null = null
-function getAmpWarn(): HTMLDivElement {
-  if (!ampWarnEl) {
-    ampWarnEl = document.createElement('div')
-    ampWarnEl.id = 'amp-warn'
-    ampWarnEl.textContent = '!! 電流超過紅線 AMP OVER REDLINE !!'
-    document.body.appendChild(ampWarnEl)
+function renderPanel(s: GameState, amp: number): void {
+  const phaseText = PHASE_TEXT[s.phase] + (s.loseReason ? ' / ' + LOSE_TEXT[s.loseReason] : '')
+  setText('cp-phase', phaseText)
+  setText('cp-eta', formatETA(s.eta))
+
+  setBar('cp-pwr-bar', s.mainPwr)
+  setText('cp-pwr', `${s.mainPwr.toFixed(1)}%`)
+
+  setBar('cp-o2-bar', s.o2Tank)
+  setText('cp-o2', `${s.o2Tank.toFixed(1)}%`)
+
+  setText('cp-liqo2', formatLiqO2(s.liqO2))
+
+  const co2Pct = (s.co2 / CO2_LETHAL) * 100
+  setBar('cp-co2-bar', co2Pct, s.co2 > CO2_LETHAL * 0.5)
+  setText('cp-co2', `${Math.round(s.co2)} ppm`)
+
+  const tempPct = ((s.temp - TEMP_LETHAL) / (TEMP_INIT - TEMP_LETHAL)) * 100
+  setBar('cp-temp-bar', tempPct, s.temp < 10)
+  setText('cp-temp', `${s.temp.toFixed(1)}°C`)
+
+  const devText = s.devices.navComp.on ? `${s.dev.toFixed(1)}%` : 'ERR'
+  setText('cp-dev', devText)
+  const needle = $('cp-dev-needle')
+  if (needle) {
+    const angle = (s.dev / DEV_LETHAL) * 80 - 40
+    needle.style.transform = `translateX(-50%) rotate(${angle}deg)`
   }
-  return ampWarnEl
+
+  const ampPct = (amp / (AMP_REDLINE + 4)) * 100
+  setBar('cp-amp-bar', ampPct, amp > AMP_REDLINE)
+  setText('cp-amp', `${amp}A`)
+
+  const status = $('cp-status')
+  if (status) {
+    status.textContent = s.brownout ? '⚡ BROWNOUT — 按下 RESET 復電' : ''
+  }
+
+  $('amp-warn-cockpit')?.classList.toggle('visible', amp > AMP_REDLINE)
 }
 
-export function render(s: GameState, tick: number): void {
-  // ── 文字儀表板 ──────────────────────────────────────────────────────────
+export function render(s: GameState, _tick: number): void {
   const amp = (s.devices.heater.on ? 3 : 0) +
               (s.devices.co2Filter.on ? 5 : 0) +
               (s.devices.navComp.on ? 4 : 0) +
               (s.o2Releasing ? 2 : 0)
 
-  // 每行開頭固定 2 個中文字，確保數值欄垂直對齊（CJK 偏移每行一致）
-  const lines: string[] = [
-    `計次 TICK:     ${tick}`,
-    ``,
-    `倒數 ETA:      ${formatETA(s.eta)}`,
-    `主電 PWR:      ${s.mainPwr.toFixed(1)}%`,
-    `氧槽 O2 TANK:  ${s.o2Tank.toFixed(1)}%`,
-    `液氧 LIQ O2:   ${formatLiqO2(s.liqO2)}`,
-    `二氧 CO2:      ${Math.round(s.co2)} PPM`,
-    `艙溫 TEMP:     ${s.temp.toFixed(1)}°C`,
-    `偏差 DEV:      ${s.devices.navComp.on ? s.dev.toFixed(1) + '%' : 'ERR 離線'}`,
-    ``,
-    `電流 AMP:      ${amp}A${amp > 10 ? ' ⚠ 超過紅線 OVER REDLINE' : ''}`,
-    `階段 PHASE:    ${PHASE_TEXT[s.phase]}${s.loseReason ? ' / ' + LOSE_TEXT[s.loseReason] : ''}`,
-    s.brownout ? `** 跳電 BROWNOUT — 點 RESET 復電 **` : '',
-  ]
-  getDisplay().textContent = lines.join('\n')
+  renderPanel(s, amp)
 
-  // ── 控制按鈕狀態 ─────────────────────────────────────────────────────────
   const brownout = s.brownout
 
   const hd = s.devices.heater
   const heaterLocked = s.elapsed < hd.lockUntil
-  setBtn(CTRL_ID.heater, `[加熱器 HEATER: ${deviceLabel(hd)}]`, brownout || heaterLocked)
+  setBtn(CTRL_ID.heater, `加熱 HEATER ${deviceLabel(hd)}`, brownout || heaterLocked)
   setBtnClass(CTRL_ID.heater, 'btn-overheat', !brownout && heaterLocked)
   setBtnClass(CTRL_ID.heater, 'btn-degraded', !brownout && !heaterLocked && hd.degraded)
 
   const fd = s.devices.co2Filter
   const filterLocked = s.elapsed < fd.lockUntil
-  setBtn(CTRL_ID.co2Filter, `[濾罐 CO2 FILT: ${deviceLabel(fd)}]`, brownout || filterLocked)
+  setBtn(CTRL_ID.co2Filter, `濾罐 CO2 ${deviceLabel(fd)}`, brownout || filterLocked)
   setBtnClass(CTRL_ID.co2Filter, 'btn-overheat', !brownout && filterLocked)
   setBtnClass(CTRL_ID.co2Filter, 'btn-degraded', !brownout && !filterLocked && fd.degraded)
 
   const nd = s.devices.navComp
   const navLocked = s.elapsed < nd.lockUntil
-  setBtn(CTRL_ID.navComp, `[導航 NAV COMP: ${deviceLabel(nd)}]`, brownout || navLocked)
+  setBtn(CTRL_ID.navComp, `導航 NAV ${deviceLabel(nd)}`, brownout || navLocked)
   setBtnClass(CTRL_ID.navComp, 'btn-overheat', !brownout && navLocked)
   setBtnClass(CTRL_ID.navComp, 'btn-degraded', !brownout && !navLocked && nd.degraded)
 
   const o2Empty = s.liqO2 <= 0
   setBtn(CTRL_ID.o2Release,
-    o2Empty ? '[放氧 O2: EMPTY 耗盡]' : `[放氧 O2 RELEASE${s.o2Releasing ? ' ▼' : '  '}]`,
+    o2Empty ? '放氧 O2 EMPTY' : `放氧 O2${s.o2Releasing ? ' ▼' : ''}`,
     brownout || o2Empty)
 
-  // T-064: AMP 紅區閃爍警告
-  getAmpWarn().classList.toggle('visible', amp > 10)
-
-  // RESET：跳電才顯示
   const resetEl = document.getElementById(CTRL_ID.reset) as HTMLButtonElement | null
   if (resetEl) resetEl.style.display = brownout ? 'inline-block' : 'none'
 }
