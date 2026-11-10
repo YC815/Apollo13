@@ -1,13 +1,14 @@
 import type { GameState, LoseReason } from '../src/game/state'
 import { initialState, computeAmp } from '../src/game/state'
 import { step } from '../src/game/systems/index'
-import { applyToggleDevice, applySetO2Held, applyReset } from '../src/game/input'
+import { applyToggleDevice, applySetO2Held, applyReset, applySetBurnHeld } from '../src/game/input'
 import { FIXED_DT } from '../src/game/constants'
 import { mulberry32 } from '../tests/helpers'
 import type { PlayerAgent } from './playerAgent'
 
 export type RunOptions = {
   seed?: number
+  difficulty?: import('../src/game/state').Difficulty
   maxSeconds?: number
   record?: boolean
 }
@@ -53,7 +54,7 @@ export function runGame(agent: PlayerAgent, opts: RunOptions = {}): RunResult {
   const maxSeconds = opts.maxSeconds ?? 1200
   const record = opts.record ?? true
 
-  const s = initialState()
+  const s = initialState(opts.difficulty ?? 'standard')
   s.rng = mulberry32(seed)
 
   const timeline: Snapshot[] = []
@@ -74,6 +75,7 @@ export function runGame(agent: PlayerAgent, opts: RunOptions = {}): RunResult {
     if (intent.reset) applyReset(s)
     for (const id of intent.toggles) applyToggleDevice(s, id)
     applySetO2Held(s, intent.o2Held)
+    applySetBurnHeld(s, intent.burn ?? false)
 
     const wasBrownout = s.brownout
     for (let f = 0; f < 60; f++) step(s, FIXED_DT)

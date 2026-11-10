@@ -18,7 +18,7 @@ export function nav(s: GameState, dt: number): GameState {
     if (s.devDriftAcc >= 1) {
       s.devDriftAcc -= 1
       const max = s.temp < TEMP_FROST ? DEV_DRIFT_MAX_COLD : DEV_DRIFT_MAX
-      s.devDriftSample = s.rng() * max
+      s.devDriftSample = s.rng() * max * s.mods.driftMul
     }
     const drift = s.devDriftSample * dt  // %
     s.dev = Math.min(100, s.dev + drift)

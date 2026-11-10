@@ -7,6 +7,6 @@ export function temp(s: GameState, dt: number): GameState {
     s.temp += rate * dt
   }
   if (s.o2Releasing) s.temp -= O2_RELEASE_TEMP * dt
-  s.temp -= TEMP_NATURAL * dt  // 不 clamp，死亡交給 checkWinLose
+  s.temp -= TEMP_NATURAL * s.mods.drainMul * dt  // 不 clamp，死亡交給 checkWinLose
   return s
 }

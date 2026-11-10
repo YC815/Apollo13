@@ -10,6 +10,7 @@ export type PlayerIntent = {
   toggles: DeviceId[]
   o2Held: boolean
   reset: boolean
+  burn?: boolean   // 按住點火（只在點火視窗內有效）
 }
 
 export type PlayerAgent = {

@@ -1,6 +1,6 @@
 import type { GameState, DeviceId } from '../src/game/state'
 import { computeAmp } from '../src/game/state'
-import { AMP, AMP_REDLINE, OVERHEAT_LIMIT } from '../src/game/constants'
+import { AMP, AMP_REDLINE, AMP_ENGINE, OVERHEAT_LIMIT } from '../src/game/constants'
 import type { PlayerAgent, PlayerIntent } from './playerAgent'
 import { IDLE } from './playerAgent'
 
@@ -80,6 +80,20 @@ export function makeRotateAgent(): PlayerAgent {
         return !s.devices[id].on && s.elapsed >= s.devices[id].lockUntil
       }
 
+      // 1.5 點火視窗：導航開、關掉濾罐騰安培、DEV 夠低就按住點火
+      if (s.burn) {
+        if (isAvailable('navComp') && canAdd(AMP.navComp)) {
+          toggles.push('navComp')
+          return { toggles, o2Held, reset }
+        }
+        if (s.devices.navComp.on && s.dev <= s.burn.tol) {
+          const extra = s.burning ? 0 : AMP_ENGINE
+          if (computeAmp(s as GameState) + extra > AMP_REDLINE && s.devices.co2Filter.on) toggles.push('co2Filter')
+          else if (computeAmp(s as GameState) + extra > AMP_REDLINE && s.devices.heater.on) toggles.push('heater')
+          return { toggles, o2Held, reset, burn: computeAmp(s as GameState) + extra <= AMP_REDLINE || toggles.length > 0 }
+        }
+      }
+
       // 2. DEV 危險 → 開導航
       if (s.dev > ROTATE_DEV_DANGER && isAvailable('navComp') && canAdd(AMP.navComp)) {
         toggles.push('navComp')
@@ -110,6 +124,39 @@ export function makeRotateAgent(): PlayerAgent {
       }
 
       return { toggles, o2Held, reset }
+    },
+  }
+}
+
+/**
+ * smart：以「離死線還有幾秒」排序，濾罐與暖氣接力（導航全程開、兩者互斥以守 10A），
+ * 接近過熱就換手；點火視窗照 rotate 的方式處理。用來驗證困難模式可贏。
+ */
+export function makeSmartAgent(): PlayerAgent {
+  const rotate = makeRotateAgent()
+  return {
+    name: 'smart',
+    description: '依剩餘秒數決定濾罐/暖氣接力，驗證困難模式可贏',
+    decide(s: Readonly<GameState>, t: number): PlayerIntent {
+      if (s.brownout || s.burn) return rotate.decide(s, t)
+      const toggles: DeviceId[] = []
+      const nav = s.devices.navComp
+      if (!nav.on && s.elapsed >= nav.lockUntil) return { toggles: ['navComp'], o2Held: false, reset: false }
+      const k = s.mods.drainMul
+      const tempLeft = s.temp / (0.035 * k)
+      const co2Left = (10000 - s.co2) / (20 * k)
+      const want: DeviceId = tempLeft < co2Left ? 'heater' : 'co2Filter'
+      const other: DeviceId = want === 'heater' ? 'co2Filter' : 'heater'
+      const lim = (id: 'heater' | 'co2Filter') => OVERHEAT_LIMIT[id] * s.mods.overheatMul
+      const hot = (id: 'heater' | 'co2Filter') => s.devices[id].heat >= lim(id) * 0.9
+      const ok = (id: 'heater' | 'co2Filter') => s.elapsed >= s.devices[id].lockUntil && !hot(id)
+      const pick = ok(want) ? want : ok(other) ? other : null
+      for (const id of ['heater', 'co2Filter'] as const) {
+        if (s.devices[id].on && (id !== pick)) toggles.push(id)
+      }
+      if (pick && !s.devices[pick].on) toggles.push(pick)
+      const o2Held = s.o2Tank < 22 && s.liqO2 > 0 && !(pick === 'co2Filter' && s.devices.co2Filter.on && !toggles.includes('co2Filter'))
+      return { toggles, o2Held, reset: false }
     },
   }
 }

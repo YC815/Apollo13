@@ -1,8 +1,11 @@
 import {
   ETA_INIT, PWR_INIT, O2_INIT, LIQO2_INIT,
   CO2_INIT, TEMP_INIT, DEV_INIT,
-  AMP,
+  AMP, AMP_ENGINE, DIFFICULTY, MET_START,
 } from './constants'
+import type { Difficulty, Mods } from './constants'
+import type { MissionEventId } from './mission'
+export type { Difficulty, Mods }
 
 export type DeviceId = 'heater' | 'co2Filter' | 'navComp'
 
@@ -42,13 +45,50 @@ export type GameState = {
   dev30PenaltyApplied: boolean
   lastDeviceOn: DeviceId | null
   ampOverRedSeconds: number
+
+  // ── 難度與任務事件 ──
+  difficulty: Difficulty
+  mods: Mods
+  burnHeld: boolean           // 玩家是否按住點火
+  burning: boolean            // 本幀引擎是否在燒（計入 AMP）
+  burn: ActiveBurn | null     // 進行中的點火視窗
+  nextEvent: number           // MISSION_EVENTS 中下一個待觸發的索引
+  mailbox: boolean            // 郵箱轉接器完成（濾罐增效）
+  losUntil: number            // 通訊中斷到 elapsed 的哪秒
+  log: LogEntry[]             // 事件紀錄（UI 讀取）
+  stats: Stats
+}
+
+export type ActiveBurn = {
+  id: MissionEventId
+  until: number      // 視窗關閉的 elapsed
+  progress: number   // 已累積點火秒數
+  hold: number
+  tol: number
+}
+
+export type LogEntry = {
+  t: number
+  kind: 'event' | 'burn-open' | 'burn-ok' | 'burn-fail' | 'brownout' | 'overheat'
+  id?: MissionEventId | DeviceId
+}
+
+export type Stats = {
+  brownouts: number
+  overheats: number
+  burnsOk: number
+  burnsFailed: number
+  minTemp: number
+  minO2: number
+  maxCo2: number
+  maxDev: number
 }
 
 function makeDevice(): DeviceState {
   return { on: false, heat: 0, lockUntil: 0, degraded: false }
 }
 
-export function initialState(): GameState {
+export function initialState(difficulty: Difficulty = 'standard'): GameState {
   return {
     phase: 'playing',
     loseReason: null,
@@ -74,7 +114,25 @@ export function initialState(): GameState {
     dev30PenaltyApplied: false,
     lastDeviceOn: null,
     ampOverRedSeconds: 0,
+    difficulty,
+    mods: { ...DIFFICULTY[difficulty] },
+    burnHeld: false,
+    burning: false,
+    burn: null,
+    nextEvent: 0,
+    mailbox: false,
+    losUntil: 0,
+    log: [],
+    stats: {
+      brownouts: 0, overheats: 0, burnsOk: 0, burnsFailed: 0,
+      minTemp: TEMP_INIT, minO2: O2_INIT, maxCo2: CO2_INIT, maxDev: DEV_INIT,
+    },
   }
+}
+
+/** 由 ETA 換算目前任務經過時間（MET 秒） */
+export function computeMET(s: GameState): number {
+  return MET_START + (ETA_INIT - s.eta)
 }
 
 // 衍生值：不存 state，每幀現算（D-008）
@@ -84,5 +142,6 @@ export function computeAmp(s: GameState): number {
   if (s.devices.co2Filter.on) amp += AMP.co2Filter
   if (s.devices.navComp.on)   amp += AMP.navComp
   if (s.o2Releasing)          amp += AMP.o2Release
+  if (s.burning)              amp += AMP_ENGINE
   return amp
 }

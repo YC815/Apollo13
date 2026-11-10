@@ -131,3 +131,22 @@ describe('C. 不變量：數值不超出合理範圍', () => {
     }
   })
 })
+
+// ── C. 新版：難度 × 任務事件 ────────────────────────────────────────────────
+import { makeSmartAgent } from './strategies'
+
+describe('C. 三種難度都「用心玩能贏」，不操作必輸', () => {
+  for (const difficulty of ['training', 'standard', 'hard'] as const) {
+    it(`${difficulty}: smart 五種子全勝、doNothing 全敗`, () => {
+      for (const seed of [1, 2, 3, 7, 42]) {
+        expect(runGame(makeSmartAgent(), { seed, difficulty, record: false }).outcome).toBe('win')
+        expect(runGame(doNothing, { seed, difficulty, record: false }).outcome).toBe('lose')
+      }
+    })
+  }
+
+  it('點火視窗：rotate 會完成三次歷史點火', () => {
+    const r = runGame(makeRotateAgent(), { seed: 1, record: false })
+    expect(r.outcome).toBe('win')
+  })
+})

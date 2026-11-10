@@ -63,3 +63,28 @@ export const OVERHEAT_LIMIT = { heater: 12, co2Filter: 8 } as const
 export type OverheatingId = keyof typeof OVERHEAT_LIMIT
 export const OVERHEAT_COOL_RATE = 1.5   // 散熱速率（P5 可調）
 export const LOCK_SECONDS = 5
+
+// ── 任務時鐘（MET）──
+// 濺落 MET 142:54:00；ETA_INIT 87h → 爆炸後的起點 MET 55:54:00
+export const MET_SPLASHDOWN = 142 * 3600 + 54 * 60
+export const MET_START = MET_SPLASHDOWN - ETA_INIT
+
+// ── 點火視窗（歷史燃燒：DPS-1、PC+2、MCC-5）──
+export const AMP_ENGINE = 2              // 點火時下降段引擎萬向架/閥門耗電
+export const MAILBOX_FILTER_MUL = 1.3    // 「郵箱」轉接器完成後濾罐效率
+
+// ── 難度 ──
+export type Difficulty = 'training' | 'standard' | 'hard'
+export type Mods = {
+  drainMul: number        // O2 消耗、CO2 累積、自然降溫的倍率
+  driftMul: number        // 盲飛漂移倍率
+  overheatMul: number     // 過熱上限倍率（>1 更耐操）
+  degradeChance: number   // 跳電後降效機率
+  burnTimeMul: number     // 點火視窗長度倍率
+  burnTolBonus: number    // 點火 DEV 容許值加成（%）
+}
+export const DIFFICULTY: Record<Difficulty, Mods> = {
+  training: { drainMul: 0.75, driftMul: 0.6,  overheatMul: 1.4,  degradeChance: 0,    burnTimeMul: 1.5, burnTolBonus: 3 },
+  standard: { drainMul: 1,    driftMul: 1,    overheatMul: 1,    degradeChance: 0.5,  burnTimeMul: 1,   burnTolBonus: 0 },
+  hard:     { drainMul: 1.1,  driftMul: 1.15, overheatMul: 0.85, degradeChance: 0.75, burnTimeMul: 0.8, burnTolBonus: 0 },
+}

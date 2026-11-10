@@ -1,172 +1,106 @@
 /**
- * T-061: CO2 黑暈 vignette overlay
- * T-062: TEMP 霜花 frost overlay
- *
- * Pure DOM/CSS layer — reads GameState thresholds from constants, zero game logic.
- * Called once per RAF frame from loop.ts after render().
+ * 全畫面狀態特效（純視覺，讀 GameState，不改遊戲）：
+ * - CO2 > 5000：四周發黑；> 8000：畫面暈眩搖晃＋模糊（取代舊版不穩定的游標漂移）
+ * - TEMP < 10：程序化冰晶從邊緣長出；< 5：冰霜爬上 CRT 遮住數字
+ * - 跳電：CRT 關機動畫、艙內斷電
  */
 import type { GameState } from '../game/state'
 import { CO2_VIGNETTE, CO2_LETHAL, CO2_CURSOR, TEMP_FROST, TEMP_FROST_HEAVY } from '../game/constants'
 
-let vignette: HTMLDivElement | null = null
+let frostURL = ''
 
-function getVignette(): HTMLDivElement {
-  if (!vignette) {
-    vignette = document.createElement('div')
-    Object.assign(vignette.style, {
-      position:      'fixed',
-      inset:         '0',
-      pointerEvents: 'none',
-      zIndex:        '100',
-      background:    'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.95) 100%)',
-      opacity:       '0',
-      transition:    'opacity 0.5s ease',
-    })
-    document.body.appendChild(vignette)
-  }
-  return vignette
-}
+/** 用 canvas 畫一張「從四邊往內長」的冰晶貼圖（只畫一次） */
+function makeFrost(w = 1280, h = 800): string {
+  const c = document.createElement('canvas')
+  c.width = w; c.height = h
+  const g = c.getContext('2d')!
+  const grd = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.65)
+  grd.addColorStop(0, 'rgba(200,230,255,0)')
+  grd.addColorStop(1, 'rgba(200,230,255,0.35)')
+  g.fillStyle = grd; g.fillRect(0, 0, w, h)
 
-// ── T-062: Frost ─────────────────────────────────────────────────────────────
-
-let frost: HTMLDivElement | null = null
-let frostHeavy: HTMLDivElement | null = null
-
-function getFrost(): HTMLDivElement {
-  if (!frost) {
-    frost = document.createElement('div')
-    Object.assign(frost.style, {
-      position:      'fixed',
-      inset:         '0',
-      pointerEvents: 'none',
-      zIndex:        '101',
-      // white crystalline edge — inward blur via box-shadow on ::before would need class;
-      // use a simple radial from white edges to transparent center
-      background:    'radial-gradient(ellipse at center, transparent 35%, rgba(180,220,255,0.6) 100%)',
-      opacity:       '0',
-      transition:    'opacity 0.8s ease',
-    })
-    document.body.appendChild(frost)
-  }
-  return frost
-}
-
-function getFrostHeavy(): HTMLDivElement {
-  if (!frostHeavy) {
-    frostHeavy = document.createElement('div')
-    Object.assign(frostHeavy.style, {
-      position:        'fixed',
-      inset:           '0',
-      pointerEvents:   'none',
-      zIndex:          '102',
-      background:      'radial-gradient(ellipse at center, transparent 20%, rgba(200,230,255,0.85) 80%, rgba(220,240,255,0.95) 100%)',
-      opacity:         '0',
-      transition:      'opacity 0.8s ease',
-      backdropFilter:  'blur(2px)',
-    })
-    document.body.appendChild(frostHeavy)
-  }
-  return frostHeavy
-}
-
-export function updateFrost(s: GameState): void {
-  const light = getFrost()
-  const heavy = getFrostHeavy()
-
-  if (s.temp >= TEMP_FROST) {
-    light.style.opacity = '0'
-    heavy.style.opacity = '0'
-    return
-  }
-
-  if (s.temp >= TEMP_FROST_HEAVY) {
-    // TEMP_FROST_HEAVY(5) ≤ temp < TEMP_FROST(10): light frost, linear 0→1
-    const t = (TEMP_FROST - s.temp) / (TEMP_FROST - TEMP_FROST_HEAVY)
-    light.style.opacity = t.toFixed(3)
-    heavy.style.opacity = '0'
-  } else {
-    // temp < TEMP_FROST_HEAVY(5): light frost full + heavy frost growing
-    light.style.opacity = '1'
-    const t = Math.min(1, (TEMP_FROST_HEAVY - s.temp) / TEMP_FROST_HEAVY)
-    heavy.style.opacity = t.toFixed(3)
-  }
-}
-
-// ── T-063: Cursor drift ──────────────────────────────────────────────────────
-
-let cursorDriftActive = false
-let driftInterval: ReturnType<typeof setInterval> | null = null
-let driftX = 0
-let driftY = 0
-
-function applyDrift(maxPx: number): void {
-  driftX = (Math.random() - 0.5) * 2 * maxPx
-  driftY = (Math.random() - 0.5) * 2 * maxPx
-}
-
-function startCursorDrift(maxPx: number): void {
-  if (driftInterval) clearInterval(driftInterval)
-  // Update drift target ~4× per second
-  driftInterval = setInterval(() => applyDrift(maxPx), 250)
-}
-
-function stopCursorDrift(): void {
-  if (driftInterval) { clearInterval(driftInterval); driftInterval = null }
-  driftX = 0; driftY = 0
-}
-
-// Intercept pointer events to shift the click target
-let driftHandler: ((e: PointerEvent) => void) | null = null
-
-function installDriftHandler(): void {
-  if (driftHandler) return
-  driftHandler = (e: PointerEvent) => {
-    if (driftX === 0 && driftY === 0) return
-    const el = document.elementFromPoint(e.clientX + driftX, e.clientY + driftY)
-    if (el && el !== e.target) {
-      // Re-dispatch to the drifted target so click lands in wrong place
-      el.dispatchEvent(new PointerEvent(e.type, { ...e, bubbles: true, cancelable: true }))
-      e.stopPropagation()
+  g.lineCap = 'round'
+  // 羽狀冰晶（dendrite）：主幹 + 兩側 60° 細羽，越往內越細越淡
+  const feather = (x: number, y: number, ang: number, len: number, w0: number, depth: number) => {
+    const steps = Math.max(3, Math.floor(len / 6))
+    let px = x, py = y
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps
+      const nx = x + Math.cos(ang) * len * t, ny = y + Math.sin(ang) * len * t
+      g.strokeStyle = `rgba(230,245,255,${0.32 * (1 - t * 0.7)})`
+      g.lineWidth = w0 * (1 - t * 0.8)
+      g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke()
+      if (depth > 0 && i % 2 === 0) {
+        const bl = len * (1 - t) * (0.28 + Math.random() * 0.12)
+        if (bl > 3) {
+          feather(nx, ny, ang + Math.PI / 3, bl, w0 * 0.55, depth - 1)
+          feather(nx, ny, ang - Math.PI / 3, bl, w0 * 0.55, depth - 1)
+        }
+      }
+      px = nx; py = ny
     }
   }
-  document.addEventListener('pointerdown', driftHandler, { capture: true })
-}
-
-function removeDriftHandler(): void {
-  if (!driftHandler) return
-  document.removeEventListener('pointerdown', driftHandler, { capture: true })
-  driftHandler = null
-}
-
-export function updateCursorDrift(s: GameState): void {
-  const shouldDrift = s.co2 > CO2_CURSOR
-
-  if (shouldDrift && !cursorDriftActive) {
-    cursorDriftActive = true
-    installDriftHandler()
-    // max drift 0→30px linear from CO2_CURSOR(8000) to CO2_LETHAL(10000)
-    const maxPx = Math.min(30, ((s.co2 - CO2_CURSOR) / (CO2_LETHAL - CO2_CURSOR)) * 30)
-    startCursorDrift(maxPx)
-  } else if (shouldDrift) {
-    // Update drift intensity as CO2 climbs
-    const maxPx = Math.min(30, ((s.co2 - CO2_CURSOR) / (CO2_LETHAL - CO2_CURSOR)) * 30)
-    startCursorDrift(maxPx)
-  } else if (!shouldDrift && cursorDriftActive) {
-    cursorDriftActive = false
-    stopCursorDrift()
-    removeDriftHandler()
+  const seeds = 140
+  for (let i = 0; i < seeds; i++) {
+    const edge = i % 4
+    let x = 0, y = 0, ang = 0
+    if (edge === 0) { x = Math.random() * w; y = 0; ang = Math.PI / 2 }
+    if (edge === 1) { x = Math.random() * w; y = h; ang = -Math.PI / 2 }
+    if (edge === 2) { x = 0; y = Math.random() * h; ang = 0 }
+    if (edge === 3) { x = w; y = Math.random() * h; ang = Math.PI }
+    // 角落更密更長
+    const cx = Math.min(x, w - x) / w, cy = Math.min(y, h - y) / h
+    const corner = 1 - Math.min(1, (cx + cy) * 3)
+    feather(x, y, ang + (Math.random() - 0.5) * 1.2, 30 + Math.random() * 70 + corner * 120, 1.6, 2)
   }
+  // 細碎霜點
+  for (let i = 0; i < 2500; i++) {
+    const x = Math.random() * w, y = Math.random() * h
+    const dx = Math.min(x, w - x) / w, dy = Math.min(y, h - y) / h
+    if (Math.random() > 1 - Math.min(dx, dy) * 5) continue
+    g.fillStyle = `rgba(235,248,255,${Math.random() * 0.5})`
+    g.fillRect(x, y, 1.5, 1.5)
+  }
+  return c.toDataURL('image/png')
 }
 
-// ── T-061: Vignette ───────────────────────────────────────────────────────────
+let fxCo2: HTMLElement, fxFrost: HTMLElement, cabin: HTMLElement, crtFrost: HTMLElement, portFrost: HTMLElement
 
-export function updateVignette(s: GameState): void {
-  const el = getVignette()
-  if (s.co2 <= CO2_VIGNETTE) {
-    el.style.opacity = '0'
-    return
-  }
-  // linear 0→1 from CO2_VIGNETTE(5000) to CO2_LETHAL(10000)
-  const t = Math.min(1, (s.co2 - CO2_VIGNETTE) / (CO2_LETHAL - CO2_VIGNETTE))
-  el.style.opacity = t.toFixed(3)
+export function initEffects(): void {
+  frostURL = makeFrost()
+  fxCo2 = document.getElementById('fx-co2')!
+  fxFrost = document.getElementById('fx-frost')!
+  cabin = document.getElementById('cabin')!
+  crtFrost = document.querySelector('.crt-frost') as HTMLElement
+  portFrost = document.querySelector('.porthole-frost') as HTMLElement
+  for (const el of [fxFrost, crtFrost, portFrost]) el.style.backgroundImage = `url(${frostURL})`
+}
+
+export function updateEffects(s: GameState): void {
+  const co2t = s.co2 <= CO2_VIGNETTE ? 0 : Math.min(1, (s.co2 - CO2_VIGNETTE) / (CO2_LETHAL - CO2_VIGNETTE))
+  fxCo2.style.opacity = co2t.toFixed(3)
+  cabin.classList.toggle('is-dizzy', s.co2 > CO2_CURSOR && s.phase === 'playing')
+
+  const light = s.temp >= TEMP_FROST ? 0 : Math.min(1, (TEMP_FROST - s.temp) / (TEMP_FROST - TEMP_FROST_HEAVY))
+  const heavy = s.temp >= TEMP_FROST_HEAVY ? 0 : Math.min(1, (TEMP_FROST_HEAVY - s.temp) / TEMP_FROST_HEAVY)
+  fxFrost.style.opacity = (light * 0.6 + heavy * 0.4).toFixed(3)
+  portFrost.style.opacity = (light * 0.8).toFixed(3)
+  crtFrost.style.opacity = (heavy * 0.95).toFixed(3)
+}
+
+export function clearEffects(): void {
+  fxCo2.style.opacity = '0'; fxFrost.style.opacity = '0'
+  portFrost.style.opacity = '0'; crtFrost.style.opacity = '0'
+  cabin.classList.remove('is-dizzy', 'is-brownout')
+}
+
+export function shake(): void {
+  cabin.classList.remove('is-shake')
+  void cabin.offsetWidth
+  cabin.classList.add('is-shake')
+}
+
+export function flash(): void {
+  const f = document.getElementById('fx-flash')!
+  f.classList.remove('go'); void f.offsetWidth; f.classList.add('go')
 }
