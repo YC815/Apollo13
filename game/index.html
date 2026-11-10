@@ -2,109 +2,263 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>阿波羅 13 號：電力搶救 Apollo 13: Power Triage</title>
-    <link rel="stylesheet" href="/src/ui/cockpit.css" />
-    <style>
-      * { box-sizing: border-box; }
-      body { margin: 0; background: #000; color: #0f0; font-family: monospace; overflow: hidden; }
-      #app { position: relative; width: 100vw; height: 100vh; }
-      #canvas-container { position: absolute; inset: 0; }
-      #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-
-      .hud-dock {
-        position: absolute;
-        left: 0; right: 0; bottom: 0;
-        padding: 0 12px 12px;
-        pointer-events: none;
-      }
-      .hud-dock > * { pointer-events: auto; }
-
-      #title-bar {
-        position: absolute; top: 16px; right: 20px;
-        color: rgba(0, 255, 0, 0.6); font-size: 11px;
-        letter-spacing: 2px; pointer-events: none;
-        text-align: right; z-index: 11;
-      }
-      body.mode-interior #title-bar { opacity: 0.35; }
-
-      @keyframes flashRed    { 0%,100%{border-color:#3a5a3a;color:#3f6} 50%{border-color:#f44;color:#f44} }
-      @keyframes flashYellow { 0%,100%{border-color:#3a5a3a;color:#3f6} 50%{border-color:#fa0;color:#fa0} }
-      @keyframes flashAmp    { 0%,100%{color:#f44} 50%{color:#ff0} }
-      .btn-overheat { animation: flashRed 0.4s infinite }
-      .btn-degraded { animation: flashYellow 1.2s infinite }
-      .amp-warn-inline {
-        display: none; color: #f44; animation: flashAmp 0.3s infinite;
-        font-weight: bold; font-size: 11px;
-      }
-      .amp-warn-inline.visible { display: inline; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#07090c" />
+    <title>阿波羅 13 號：極限斷電</title>
+    <meta name="description" content="1970 年阿波羅 13 號爆炸後的 87 小時，壓縮成 8 分鐘。你只有一條快斷的保險絲。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
-  <body class="mode-exterior">
+  <body>
     <div id="app">
-      <div id="canvas-container"></div>
-      <div id="title-bar">APOLLO 13<br/>POWER TRIAGE</div>
-      <div id="hud">
-        <div id="cockpit-hud">
-          <div class="hud-dock">
-            <div id="cockpit-panel">
-              <div class="panel-bezel">
-                <div class="panel-readouts">
-                  <div class="readout readout-eta">
-                    <span class="readout-label">ETA</span>
-                    <span class="readout-value readout-digital" id="cp-eta">00:00:00</span>
-                  </div>
-                  <div class="readout">
-                    <span class="readout-label">PWR</span>
-                    <div class="bar-track"><div class="bar-fill bar-pwr" id="cp-pwr-bar"></div></div>
-                    <span class="readout-value" id="cp-pwr">100%</span>
-                  </div>
-                  <div class="readout">
-                    <span class="readout-label">O2</span>
-                    <div class="bar-track"><div class="bar-fill bar-o2" id="cp-o2-bar"></div></div>
-                    <span class="readout-value" id="cp-o2">100%</span>
-                  </div>
-                  <div class="readout">
-                    <span class="readout-label">LIQ</span>
-                    <span class="readout-value readout-tanks" id="cp-liqo2">■■■</span>
-                  </div>
-                  <div class="readout">
-                    <span class="readout-label">CO2</span>
-                    <div class="bar-track"><div class="bar-fill bar-co2" id="cp-co2-bar"></div></div>
-                    <span class="readout-value" id="cp-co2">400</span>
-                  </div>
-                  <div class="readout">
-                    <span class="readout-label">TEMP</span>
-                    <div class="bar-track"><div class="bar-fill bar-temp" id="cp-temp-bar"></div></div>
-                    <span class="readout-value" id="cp-temp">21°</span>
-                  </div>
-                  <div class="readout readout-dev">
-                    <span class="readout-label">DEV</span>
-                    <div class="dev-dial"><div class="dev-needle" id="cp-dev-needle"></div></div>
-                    <span class="readout-value" id="cp-dev">0%</span>
-                  </div>
-                  <div class="readout readout-amp">
-                    <span class="readout-label">AMP</span>
-                    <div class="bar-track bar-amp-track"><div class="bar-fill bar-amp" id="cp-amp-bar"></div></div>
-                    <span class="readout-value" id="cp-amp">0A</span>
-                  </div>
-                </div>
+      <!-- ═════════════ 駕駛艙 ═════════════ -->
+      <div id="cabin" class="cabin">
+        <header class="topbar panel-metal">
+          <button id="master-alarm" class="master-alarm" title="主警報：點擊可靜音警報聲">
+            <span>MASTER</span><span>ALARM</span>
+          </button>
+          <div class="mission-id">
+            <b>APOLLO 13</b>
+            <span>LM AQUARIUS · 極限斷電</span>
+          </div>
+          <div class="clock">
+            <label>MET 任務時間</label>
+            <span id="met" class="seg">055:54:00</span>
+          </div>
+          <div class="clock clock-eta">
+            <label>ETA 距離濺落</label>
+            <span id="eta" class="seg">87:00:00</span>
+          </div>
+          <div class="topbar-btns">
+            <button id="btn-help" class="icon-btn" title="操作說明 (H)">?</button>
+            <button id="btn-mute" class="icon-btn" title="靜音 (M)">♪</button>
+            <button id="btn-pause" class="icon-btn" title="暫停 (P / Esc)">❚❚</button>
+          </div>
+        </header>
 
-                <div class="panel-status-bar">
-                  <span class="panel-phase" id="cp-phase">PLAYING</span>
-                  <span class="panel-status" id="cp-status"></span>
-                  <span id="amp-warn-cockpit" class="amp-warn-inline">!! AMP OVER REDLINE !!</span>
-                </div>
+        <main class="upper">
+          <!-- 舷窗 + 軌道 -->
+          <section class="col-view">
+            <div class="porthole">
+              <div id="space" class="space"></div>
+              <div class="porthole-frost"></div>
+              <div class="porthole-glare"></div>
+              <div class="porthole-tag" id="view-tag">月球接近中</div>
+            </div>
+            <div class="trajectory panel-metal">
+              <div class="panel-title"><span>返航軌道</span><span class="en">FREE-RETURN TRAJECTORY</span><span id="traj-pct" class="traj-pct">0%</span></div>
+              <svg id="traj" viewBox="0 0 400 150" aria-label="軌道進度"></svg>
+            </div>
+          </section>
 
-                <div class="panel-actions">
-                  <div id="view-slot-cockpit" class="panel-view-slot"></div>
-                  <div id="controls-slot-cockpit" class="panel-controls-slot"></div>
+          <!-- CRT 主螢幕 -->
+          <section class="col-crt panel-metal">
+            <div class="crt">
+              <div class="crt-inner" id="crt">
+                <div class="crt-head">
+                  <span>LM ECS / EPS STATUS</span>
+                  <span id="crt-mode" class="crt-mode">NOMINAL</span>
                 </div>
+                <div id="readouts" class="readouts"></div>
+                <div id="burn-banner" class="burn-banner" hidden></div>
               </div>
+              <div class="crt-scan"></div>
+              <div class="crt-glass"></div>
+              <div class="crt-frost"></div>
+            </div>
+          </section>
+
+          <!-- CAPCOM 通訊 -->
+          <section class="col-comms panel-metal">
+            <div class="panel-title"><span>休士頓通訊</span><span class="en">CAPCOM LOOP</span><span id="comm-sig" class="comm-sig">● LINK</span></div>
+            <div id="capcom-log" class="capcom-log" aria-live="polite"></div>
+            <div class="checklist" id="checklist"></div>
+          </section>
+        </main>
+
+        <!-- 控制台 -->
+        <footer class="console panel-metal">
+          <div class="switches">
+            <div class="sw" data-dev="heater">
+              <div class="sw-head"><b>暖氣</b><i>HEATER</i><em>3A</em></div>
+              <button class="toggle" aria-pressed="false" aria-label="暖氣開關"><span class="t-plate"></span><span class="t-lever"></span></button>
+              <div class="sw-lamp"></div>
+              <div class="heat"><div class="heat-fill"></div></div>
+              <div class="sw-foot"><kbd>1</kbd><span class="sw-state">OFF</span></div>
+              <div class="sw-fx">艙溫 ↑</div>
+            </div>
+            <div class="sw" data-dev="co2Filter">
+              <div class="sw-head"><b>濾罐</b><i>CO2 FILTER</i><em>5A</em></div>
+              <button class="toggle" aria-pressed="false" aria-label="CO2 濾罐開關"><span class="t-plate"></span><span class="t-lever"></span></button>
+              <div class="sw-lamp"></div>
+              <div class="heat"><div class="heat-fill"></div></div>
+              <div class="sw-foot"><kbd>2</kbd><span class="sw-state">OFF</span></div>
+              <div class="sw-fx">CO2 ↓</div>
+            </div>
+            <div class="sw" data-dev="navComp">
+              <div class="sw-head"><b>導航</b><i>NAV COMP</i><em>4A</em></div>
+              <button class="toggle" aria-pressed="false" aria-label="導航電腦開關"><span class="t-plate"></span><span class="t-lever"></span></button>
+              <div class="sw-lamp"></div>
+              <div class="heat heat-none"><div class="heat-fill"></div></div>
+              <div class="sw-foot"><kbd>3</kbd><span class="sw-state">OFF</span></div>
+              <div class="sw-fx">ETA 推進・DEV ↓</div>
             </div>
           </div>
-        </div>
+
+          <div class="valve-wrap">
+            <div class="sw-head"><b>放氧閥</b><i>O2 RELEASE</i><em>2A</em></div>
+            <button id="valve" class="valve" aria-label="按住放氧"><span class="valve-wheel"></span><span class="valve-txt">按住</span></button>
+            <div class="tanks" id="tanks"><div class="tank"><i></i></div><div class="tank"><i></i></div><div class="tank"><i></i></div></div>
+            <div class="sw-foot"><kbd>空白鍵</kbd><span>O2 ↑ 艙溫 ↓↓</span></div>
+          </div>
+
+          <div class="ignite-wrap">
+            <div class="sw-head"><b>引擎點火</b><i>DPS IGNITE</i><em>2A</em></div>
+            <button id="ignite" class="ignite" disabled aria-label="按住點火">
+              <svg viewBox="0 0 100 100" class="ignite-ring"><circle cx="50" cy="50" r="44" class="ring-bg"/><circle cx="50" cy="50" r="44" class="ring-fg" id="ignite-ring"/></svg>
+              <span class="ignite-cover"></span>
+              <span class="ignite-txt">待命</span>
+            </button>
+            <div class="sw-foot"><kbd>F</kbd><span id="ignite-hint">等待點火視窗</span></div>
+          </div>
+
+          <div class="amp-wrap">
+            <svg id="amp-gauge" class="amp-gauge" viewBox="0 0 200 130"></svg>
+            <div class="amp-read"><span id="amp-val">0</span><small>A / 10A 上限</small></div>
+          </div>
+
+          <div class="breaker-wrap">
+            <div class="sw-head"><b>主斷路器</b><i>MAIN BUS</i></div>
+            <button id="breaker" class="breaker" aria-label="重置斷路器"><span class="breaker-handle"></span></button>
+            <div class="sw-foot"><kbd>R</kbd><span id="breaker-state">正常</span></div>
+          </div>
+        </footer>
       </div>
+
+      <!-- ═════════════ 特效層 ═════════════ -->
+      <div id="fx-co2" class="fx fx-co2"></div>
+      <div id="fx-frost" class="fx fx-frost"></div>
+      <div id="fx-alarm" class="fx fx-alarm"></div>
+      <div id="fx-blackout" class="fx fx-blackout"></div>
+      <div id="fx-flash" class="fx fx-flash"></div>
+
+      <!-- ═════════════ 畫面 ═════════════ -->
+      <section id="scr-title" class="screen screen-title">
+        <div class="title-wrap">
+          <div class="title-kicker">APRIL 13, 1970 · MET 55:54:53</div>
+          <h1 class="title-main"><span>APOLLO 13</span><b>極限斷電</b></h1>
+          <p class="title-sub">服務艙爆炸，主電力全滅。三個人擠進只為兩人、兩天設計的登月艙。<br />87 小時的返航，壓縮成 8 分鐘——你只有一條快燒斷的保險絲。</p>
+          <div class="diff" id="diff">
+            <button class="diff-card" data-diff="training">
+              <b>訓練</b><i>TRAINING</i>
+              <span>消耗慢、偏移小、不會降效。全程有休士頓教學。</span>
+            </button>
+            <button class="diff-card" data-diff="standard">
+              <b>任務</b><i>FLIGHT</i>
+              <span>原版數值。需要輪流調度三台設備才能回家。</span>
+            </button>
+            <button class="diff-card" data-diff="hard">
+              <b>1970</b><i>NO MARGIN</i>
+              <span>更冷、更容易過熱、跳電更傷。電力會撐到最後一滴。</span>
+            </button>
+          </div>
+          <div class="title-actions">
+            <button id="btn-start" class="btn-primary">開始任務 ▶</button>
+            <button id="btn-howto" class="btn-ghost">操作說明</button>
+            <button id="btn-history" class="btn-ghost">真實歷史</button>
+          </div>
+          <div class="title-best" id="title-best"></div>
+          <label class="title-skip"><input type="checkbox" id="opt-intro" checked /> 播放開場過場</label>
+        </div>
+      </section>
+
+      <section id="scr-brief" class="screen screen-brief" hidden>
+        <div class="brief-wrap">
+          <h2>任務簡報 <small>HOW TO SURVIVE</small></h2>
+          <div class="brief-grid">
+            <div class="brief-card">
+              <div class="brief-ico">🎯</div>
+              <h3>目標</h3>
+              <p><b>ETA</b> 倒數到 0 = 濺落回家。<br />ETA <b>只有導航開著</b>才會前進。</p>
+            </div>
+            <div class="brief-card">
+              <div class="brief-ico">☠</div>
+              <h3>五種死法</h3>
+              <p>電力 0%・氧氣 0%・CO2 10000 ppm・艙溫 0°C・偏離 50%。<br />任何一條歸零就結束。</p>
+            </div>
+            <div class="brief-card">
+              <div class="brief-ico">⚡</div>
+              <h3>10A 保險絲</h3>
+              <p>暖氣 3A・濾罐 5A・導航 4A・放氧 2A・點火 2A。<br /><b>超過 10A 持續 2 秒就跳電</b>，扣電力、設備可能永久降效。</p>
+            </div>
+            <div class="brief-card">
+              <div class="brief-ico">🔥</div>
+              <h3>過熱</h3>
+              <p>暖氣連續 12 秒、濾罐連續 8 秒會過熱鎖死 5 秒。<br />看開關下方的<b>熱量條</b>，滿之前先關。</p>
+            </div>
+            <div class="brief-card">
+              <div class="brief-ico">🧭</div>
+              <h3>盲飛</h3>
+              <p>關掉導航省 4A，但偏離度會<b>看不見地</b>累積、ETA 停住。<br />太冷時漂得更兇。</p>
+            </div>
+            <div class="brief-card">
+              <div class="brief-ico">🚀</div>
+              <h3>歷史點火</h3>
+              <p>航程中會開三次點火視窗。導航開著、DEV 夠低時<b>按住點火</b>。<br />點火也吃 2A——記得先騰出電流。</p>
+            </div>
+          </div>
+          <div class="brief-keys">
+            <span><kbd>1</kbd>暖氣</span><span><kbd>2</kbd>濾罐</span><span><kbd>3</kbd>導航</span>
+            <span><kbd>空白鍵</kbd>按住放氧</span><span><kbd>F</kbd>按住點火</span><span><kbd>R</kbd>重置跳電</span><span><kbd>P</kbd>暫停</span>
+          </div>
+          <div class="brief-actions">
+            <button id="btn-brief-go" class="btn-primary">了解，出發 ▶</button>
+            <button id="btn-brief-back" class="btn-ghost">返回</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="scr-history" class="screen screen-brief" hidden>
+        <div class="brief-wrap history">
+          <h2>真實的阿波羅 13 號 <small>WHAT REALLY HAPPENED</small></h2>
+          <ol class="timeline" id="history-list"></ol>
+          <p class="history-src">資料來源：NASA Apollo Flight Journal、NASA SP-4029、NTRS 20090026451。遊戲把 87 小時壓縮約 652.5 倍。</p>
+          <div class="brief-actions"><button id="btn-history-back" class="btn-ghost">返回</button></div>
+        </div>
+      </section>
+
+      <section id="scr-intro" class="screen screen-intro" hidden>
+        <div class="intro-text" id="intro-text"></div>
+        <button class="intro-skip" id="btn-skip">跳過 ▶▶</button>
+      </section>
+
+      <section id="scr-pause" class="screen screen-pause" hidden>
+        <div class="pause-wrap">
+          <h2>暫停 <small>HOLD</small></h2>
+          <button id="btn-resume" class="btn-primary">繼續 ▶</button>
+          <button id="btn-pause-help" class="btn-ghost">操作說明</button>
+          <button id="btn-restart" class="btn-ghost">重新開始</button>
+          <button id="btn-menu" class="btn-ghost">回主選單</button>
+        </div>
+      </section>
+
+      <section id="scr-end" class="screen screen-end" hidden>
+        <div class="end-wrap">
+          <div class="end-kicker" id="end-kicker"></div>
+          <h2 class="end-title" id="end-title"></h2>
+          <div class="end-grade" id="end-grade"></div>
+          <p class="end-desc" id="end-desc"></p>
+          <div class="end-tip" id="end-tip"></div>
+          <div class="end-stats" id="end-stats"></div>
+          <div class="end-history" id="end-history"></div>
+          <div class="brief-actions">
+            <button id="btn-retry" class="btn-primary">再試一次 ↻</button>
+            <button id="btn-end-menu" class="btn-ghost">主選單</button>
+          </div>
+        </div>
+      </section>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

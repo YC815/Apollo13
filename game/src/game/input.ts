@@ -21,3 +21,9 @@ export function applyReset(s: GameState): GameState {
   s.brownout = false
   return s
 }
+
+export function applySetBurnHeld(s: GameState, held: boolean): GameState {
+  if (held && (s.brownout || !s.burn)) { s.burnHeld = false; return s }
+  s.burnHeld = held
+  return s
+}

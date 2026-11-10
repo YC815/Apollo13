@@ -10,6 +10,6 @@ export function oxygen(s: GameState, dt: number): GameState {
     s.liqO2 = Math.max(0, s.liqO2 - dt)
   }
 
-  s.o2Tank = Math.max(0, s.o2Tank - O2_DRAIN * dt)  // 自然消耗恆發生
+  s.o2Tank = Math.max(0, s.o2Tank - O2_DRAIN * s.mods.drainMul * dt)  // 自然消耗恆發生
   return s
 }
